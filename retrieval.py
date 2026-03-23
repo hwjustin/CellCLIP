@@ -89,6 +89,18 @@ def parse_args():
             "Need to specify when not using embedding models. "
         ),
     )
+    parser.add_argument(
+        "--sample_index_file",
+        type=str,
+        default=None,
+        help="Override sample index/split file path (for INCHIKEY-level retrieval)",
+    )
+    parser.add_argument(
+        "--molecule_path",
+        type=str,
+        default=None,
+        help="Override molecule/caption file path (for INCHIKEY-level retrieval)",
+    )
 
     return parser.parse_args()
 
@@ -177,9 +189,12 @@ def main(args):
 
     model = load(ckpt_path, device, args.model_type, args.input_dim, args.loss_type)
 
-    sample_index_file = os.path.join(
-        args.outdir, args.split_label_dir, "cellpainting-split-test-imgpermol.csv"
-    )
+    if args.sample_index_file is not None:
+        sample_index_file = args.sample_index_file
+    else:
+        sample_index_file = os.path.join(
+            args.outdir, args.split_label_dir, "cellpainting-split-test-imgpermol.csv"
+        )
 
     preprocess_val = _transform(
         args.image_resolution_train, args.image_resolution_val, False, "dataset", "crop"
@@ -228,11 +243,14 @@ def main(args):
         mole_struc = "morgan"
         context_length = 77
 
-    if args.unique:
+    if args.embedding_type is not None:
         image_directory_path = os.path.join(
             constants.DATASET_DIR, "bray2017/img", args.embedding_type
         )
         preprocess_val = None
+
+    if args.molecule_path is not None:
+        molecule_path = args.molecule_path
 
     test_dataset = CellPainting(
         sample_index_file,

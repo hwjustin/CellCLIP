@@ -1,8 +1,8 @@
 """Global constants"""
 
-OUT_DIR = "your_model_output_dir"
-DATASET_DIR = "dataset_directory"
-SPLIT_LABEL_DIR = "label_directory"
+OUT_DIR = "/data/huadi/cellpainting_data"
+DATASET_DIR = "/data/huadi/cellpainting_data"
+SPLIT_LABEL_DIR = "cpg0012/splits"
 
 _MODELS = {
     "RN50": "https://openaipublic.azureedge.net/clip/models/afeb0e10f9e5a86da6080e35cf09123aca3b358a0c3e3b6c78a7b63bc04b6762/RN50.pt",

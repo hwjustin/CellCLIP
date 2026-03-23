@@ -139,6 +139,15 @@ class CellPainting(Dataset):
         mol_keys = list(molecule_df.index.values)
         keys = list(set(sample_keys) & set(mol_keys))
 
+        # Filter to keys present in HDF5 file if using HDF5 images
+        if self.is_hdf5:
+            h5_keys = set(self.img_ids)
+            keys_before = len(keys)
+            keys = [k for k in keys if k in h5_keys]
+            if keys_before != len(keys):
+                print(f"Filtered {keys_before - len(keys)} keys missing from HDF5 "
+                      f"({len(keys)} remaining)")
+
         if len(keys) == 0:
             raise Exception("Empty dataset!")
 

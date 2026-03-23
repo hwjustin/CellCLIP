@@ -153,7 +153,7 @@ def load(
     if name in _MODELS:
         model_path = _download(
             _MODELS[name],
-            download_root or os.path.expanduser("/gscratch/aims/mingyulu/.cache/clip"),
+            download_root or os.path.expanduser("~/.cache/clip"),
         )
     elif os.path.isfile(name):
         model_path = name

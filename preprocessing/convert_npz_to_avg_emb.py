@@ -92,7 +92,11 @@ class CellPaintingDataset(Dataset):
 
     def load_view(self, filepath):
         """Load cell painting images"""
-        npz = np.load(filepath, allow_pickle=True)
+        try:
+            npz = np.load(filepath, allow_pickle=True)
+        except Exception as e:
+            print(f"WARNING: Skipping corrupted file {filepath}: {e}")
+            return None
 
         if self.dataset == "rxrx3-core":
             image = npz["images"]
@@ -156,7 +160,7 @@ class CellPaintingDataset(Dataset):
 
 def my_collate_fn(batch):
     """Customized collate function, return the list as it is"""
-    return batch
+    return [(name, imgs) for name, imgs in batch if len(imgs) > 0]
 
 
 def hierarchical_pooling(cell_embeddings, num_clusters=3, weighting="size"):
@@ -353,6 +357,10 @@ def generate_embeddings(
 
             if model_card == "openphenom":
                 embeddings = pretrained_clip.predict(batch)
+            elif "dinov2" in model_card:
+                # DINOv2 models (e.g. facebook/dinov2-giant) use last_hidden_state, not pooler_output
+                outputs = pretrained_clip(pixel_values=batch)
+                embeddings = outputs.last_hidden_state[:, 0, :]  # CLS token, 1536-dim for giant
             else:
                 embeddings = pretrained_clip(batch).pooler_output
 
@@ -503,6 +511,10 @@ def main(args):
 
         if args.model_card == "facebook/dino-vitb8":
             crop_size = processor.size["height"]
+        elif "dinov2-giant" in args.model_card:
+            # DINOv2-giant typically uses 518x518
+            cs = getattr(processor, "crop_size", None) or getattr(processor, "size", {})
+            crop_size = cs.get("height", 518) if isinstance(cs, dict) else 518
         else:
             crop_size = processor.crop_size["height"]
 
@@ -525,8 +537,8 @@ def main(args):
     # print(f"Total Parameters: {params:.2f}M")
     # print(f"Total FLOPs: {flops:.2f} GFLOPs")
 
-    output_file = (
-        f"/gscratch/aims/datasets/cellpainting/{args.dataset}/img/{args.output_file}"
+    output_file = os.path.join(
+        constants.DATASET_DIR, args.dataset, "img", args.output_file
     )
 
     org_files = os.listdir(args.input_dir)
@@ -569,12 +581,12 @@ def main(args):
     )
     dataloader = DataLoader(
         dataset,
-        batch_size=16,
+        batch_size=64,
         shuffle=False,
         drop_last=False,
         collate_fn=my_collate_fn,
         pin_memory=True,
-        num_workers=8,
+        num_workers=16,
     )
 
     pretrained_model, dataloader = accelerator.prepare(pretrained_model, dataloader)
@@ -587,6 +599,10 @@ def main(args):
     )
 
     for batch in dataloader:
+        if len(batch) == 0:
+            if accelerator.is_main_process:
+                progress_bar.update(1)
+            continue
         generate_embeddings(
             pretrained_model, batch, output_file, args.model_card, args.aggregation_strategy
         )

@@ -1037,6 +1037,9 @@ class CellCLIP(nn.Module, PyTorchModelHubMixin):
         return self.visual.transformer.resblocks[0].mlp.c_fc.weight.dtype
 
     def encode_mil(self, image):
+        if image.dim() == 3:
+            # (B, C, D) -> (B, 1, C, D) when input has no FOV dimension
+            image = image.unsqueeze(1)
         bag_feats = self.image_pool(image)  # (B, C, D)
 
         return bag_feats
