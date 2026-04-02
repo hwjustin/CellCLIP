@@ -276,29 +276,26 @@ def collate_well_bags(batch):
 
 
 class CellPaintSSLMLPHead(nn.Module):
-    """CellPaintSSL-style deep MLP classifier on concatenated features."""
+    """Classifier MLP on concatenated features."""
 
     def __init__(
         self,
         input_dim: int,
-        out_dim: int,
-        fc_units: int = 2048,
-        cls_input_dropout: float = 0.1,
-        cls_dropout: float = 0.5,
+        out_dim: int = 209,
     ):
         super().__init__()
+        if out_dim != 209:
+            raise ValueError(f"CellPaintSSLMLPHead expects out_dim=209, got {out_dim}")
         self.classifier = nn.Sequential(
-            nn.Dropout(p=cls_input_dropout),
-            nn.Linear(input_dim, fc_units),
+            nn.LayerNorm(input_dim),
+            nn.Dropout(p=0.1),
+            nn.Linear(input_dim, 1024),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=cls_dropout),
-            nn.Linear(fc_units, fc_units),
+            nn.Dropout(p=0.1),
+            nn.Linear(1024, 512),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=cls_dropout),
-            nn.Linear(fc_units, fc_units),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=cls_dropout),
-            nn.Linear(fc_units, out_dim),
+            nn.Dropout(p=0.1),
+            nn.Linear(512, 209),
         )
         self._init_parameters()
 
@@ -322,14 +319,12 @@ class JointBioactivityModel(nn.Module):
         super().__init__()
         self.cellclip_backbone = cellclip_backbone
         self.classifier = classifier
-        self.concat_norm = nn.LayerNorm(concat_dim)
 
     def forward(self, imgs: torch.Tensor, mol: Dict[str, torch.Tensor]) -> torch.Tensor:
         bag_feats = self.cellclip_backbone.encode_mil(imgs)
         cell_feats = self.cellclip_backbone.encode_image(bag_feats)
         pert_feats = self.cellclip_backbone.encode_text(mol)
         feats = torch.cat([cell_feats, pert_feats], dim=1)
-        feats = self.concat_norm(feats)
         return self.classifier(feats)
 
 
@@ -577,9 +572,6 @@ def main():
     classifier = CellPaintSSLMLPHead(
         input_dim=concat_dim,
         out_dim=len(label_pack.label_cols),
-        fc_units=args.fc_units,
-        cls_input_dropout=args.cls_input_dropout,
-        cls_dropout=args.cls_dropout,
     )
     model = JointBioactivityModel(
         cellclip_backbone=backbone,
@@ -716,9 +708,7 @@ def main():
             "classifier_state_dict": model.classifier.state_dict(),
             "concat_dim": concat_dim,
             "n_tasks": int(len(label_pack.label_cols)),
-            "fc_units": args.fc_units,
-            "cls_input_dropout": args.cls_input_dropout,
-            "cls_dropout": args.cls_dropout,
+            "classifier_arch": "LayerNorm(input_dim) -> Dropout(0.1) -> Linear(input_dim,1024) -> ReLU -> Dropout(0.1) -> Linear(1024,512) -> ReLU -> Dropout(0.1) -> Linear(512,out_dim)",
             "best_epoch": best_epoch,
             "label_cols": label_pack.label_cols,
             "excluded_optimizer_params": excluded_names,

@@ -14,7 +14,7 @@ CUDA_VISIBLE_DEVICES=1 python train_bioactivity_joint_finetune.py \
 
 ```bash
 # Full run (task loss only, end-to-end fine-tuning)
-CUDA_VISIBLE_DEVICES=1 python scenario2/train_bioactivity_joint_finetune.py \
+CUDA_VISIBLE_DEVICES=2 python scenario2/train_bioactivity_joint_finetune.py \
   --epochs 12 \
   --patience 4 \
   --train_batch_size 64 \
@@ -24,9 +24,6 @@ CUDA_VISIBLE_DEVICES=1 python scenario2/train_bioactivity_joint_finetune.py \
   --head_lr 5e-5 \
   --weight_decay 5e-4 \
   --amp \
-  --cls_input_dropout 0.1 \
-  --cls_dropout 0.5 \
-  --fc_units 2048 \
   --out_dir results/bioactivity_joint_finetune_lr5e6_head5e5
 ```
 
@@ -42,9 +39,6 @@ CUDA_VISIBLE_DEVICES=1 python scenario2/train_bioactivity_joint_finetune.py \
   --weight_decay 5e-4 \
   --amp \
   --seed 123 \
-  --cls_input_dropout 0.1 \
-  --cls_dropout 0.5 \
-  --fc_units 2048 \
   --out_dir results/bioactivity_joint_finetune_lr5e6_head5e5_seed123
 ```
 
@@ -56,5 +50,6 @@ Outputs under `--out_dir`:
 
 Notes:
 - This scenario fine-tunes both CellCLIP encoders (`encode_mil`+`encode_image`, `encode_text`) and classifier jointly.
+- Classifier head is fixed to `LayerNorm(input_dim) -> Dropout(0.1) -> Linear(input_dim,1024) -> ReLU -> Dropout(0.1) -> Linear(1024,512) -> ReLU -> Dropout(0.1) -> Linear(512,209)`.
 - Objective is task loss only (`masked_multitask_loss`, optional focal variant via `--use_focal_loss`).
 - Optimizer groups use `--backbone_lr` for visual/MIL params, `--text_lr` (or fallback to `--backbone_lr`) for text params, and `--head_lr` for classifier params.
